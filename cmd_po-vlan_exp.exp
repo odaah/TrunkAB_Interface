@@ -1,0 +1,70 @@
+#!/usr/bin/expect -f
+
+# Set variables
+ set hostname [lindex $argv 0]
+ set username $env(USER)
+ set password [lindex $argv 1]
+ set enablepassword [lindex $argv 2]
+ set f [open ~/TrunkAB/ea_po_distro.out]
+
+# Log results
+ log_file -a ~/TrunkAB/results_vlantrunk.log
+
+# Announce which device we are working on and at what time
+ send_user "\n"
+ send_user ">>>>>  Working on $hostname @ [exec date] <<<<<\n"
+ send_user "\n"
+
+# Telnet
+spawn telnet $hostname
+sleep 1
+
+expect {
+
+"Connection refused" {
+spawn ssh $hostname
+sleep 1
+expect {
+"no)? " { 
+send "yes\n"
+expect "*assword: "
+send "$password\r"
+}
+"*assword: " { 
+send "$password\n"
+}
+}
+}
+
+sleep 1
+"Username:" {
+send "$username\r"
+expect "*assword: "
+send "$password\r"
+}
+}
+
+# If we're not already in enable mode, get us there
+ sleep 1
+ expect {
+ default { send_user "\nEnable Mode Failed - Check Password\n"; exit 1 }
+ "*#" {}
+ "*>" {
+ send "enable\n"
+ expect "*assword"
+ send "$enablepassword\n"
+ expect "*#"
+ }
+ }
+
+
+ while {[gets $f line] >= 0} {
+ send "show interface $line description\n"
+ expect "#"
+ send "show interface $line switchport | i Name|Trunking|Disabled\n"
+ expect "#"
+}
+
+ send "exit\n"
+ expect ":~\$"
+ exit
